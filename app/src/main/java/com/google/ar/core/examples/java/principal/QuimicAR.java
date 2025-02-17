@@ -1,23 +1,6 @@
-/*
- * Copyright 2018 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package com.google.ar.core.examples.java.principal;
 
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
 import android.opengl.GLES20;
@@ -35,425 +18,177 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.RequestManager;
-import com.chaquo.python.Python;
-import com.chaquo.python.PyObject;
-import com.google.ar.core.Anchor;
-import com.google.ar.core.ArCoreApk;
-import com.google.ar.core.AugmentedImage;
-import com.google.ar.core.AugmentedImageDatabase;
-import com.google.ar.core.Camera;
-import com.google.ar.core.Config;
-import com.google.ar.core.Frame;
-import com.google.ar.core.Session;
-import com.google.ar.core.examples.java.principal.databinding.ActivityMainBinding;
-import com.google.ar.core.examples.java.principal.R;
-import com.google.ar.core.examples.java.principal.rendering.AugmentedImageRenderer;
-import com.google.ar.core.examples.java.common.helpers.CameraPermissionHelper;
-import com.google.ar.core.examples.java.common.helpers.DisplayRotationHelper;
-import com.google.ar.core.examples.java.common.helpers.FullScreenHelper;
-import com.google.ar.core.examples.java.common.helpers.SnackbarHelper;
-import com.google.ar.core.examples.java.common.helpers.TrackingStateHelper;
+import com.google.ar.core.*;
+import com.google.ar.core.examples.java.common.helpers.*;
 import com.google.ar.core.examples.java.common.rendering.BackgroundRenderer;
-import com.google.ar.core.exceptions.CameraNotAvailableException;
-import com.google.ar.core.exceptions.UnavailableApkTooOldException;
-import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
-import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
-import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
+import com.google.ar.core.examples.java.principal.databinding.ActivityMainBinding;
+import com.google.ar.core.examples.java.principal.rendering.AugmentedImageRenderer;
+import com.google.ar.core.examples.java.principal.rendering.MongoDBHelper;
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+import org.bson.Document;
+import java.util.*;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
-/**
- * This app extends the HelloAR Java app to include image tracking functionality.
- *
- * <p>In this example, we assume all images are static or moving slowly with a large occupation of
- * the screen. If the target is actively moving, we recommend to check
- * AugmentedImage.getTrackingMethod() and render only when the tracking method equals to
- * FULL_TRACKING. See details in <a
- * href="https://developers.google.com/ar/develop/java/augmented-images/">Recognize and Augment
- * Images</a>.
- */
 public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Renderer {
-  private static final String TAG = QuimicAR.class.getSimpleName();
-
-  // Rendering. The Renderers are created here, and initialized when the GL surface is created.
+  private static final String TAG = "QuimicAR";
   private WebView jsmolWebView;
   private GLSurfaceView surfaceView;
   private ImageView fitToScanView;
   private RequestManager glideRequestManager;
   private ActivityMainBinding binding;
   private boolean installRequested;
-
   private Session session;
   private final SnackbarHelper messageSnackbarHelper = new SnackbarHelper();
   private DisplayRotationHelper displayRotationHelper;
   private final TrackingStateHelper trackingStateHelper = new TrackingStateHelper(this);
-
   private final BackgroundRenderer backgroundRenderer = new BackgroundRenderer();
   private final AugmentedImageRenderer augmentedImageRenderer = new AugmentedImageRenderer();
-
   private boolean shouldConfigureSession = false;
-
-  // Augmented image configuration and rendering.
-  // Load a single image (true) or a pre-generated image database (false).
-  private final boolean useSingleImage = false;
-  // Augmented image and its associated center pose anchor, keyed by index of the augmented image in
-  // the
-  // database.
   private final Map<Integer, Pair<AugmentedImage, Anchor>> augmentedImageMap = new HashMap<>();
+  private MongoDBHelper mongoDBHelper;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     binding = ActivityMainBinding.inflate(getLayoutInflater());
     setContentView(binding.getRoot());
-//    Python py = Python.getInstance();
-//    PyObject result = py.getModule("script_python").callAttr("sua_funcao");
-//    String output = result.toString();
 
-    jsmolWebView = findViewById(R.id.jsmolWebView);
+    // Criar instância do MongoDBHelper
+    mongoDBHelper = new MongoDBHelper();
 
+    // Testar conexão com o MongoDB
+    if (mongoDBHelper.testarConexao()) {
+      Toast.makeText(this, "Conectado ao MongoDB!", Toast.LENGTH_SHORT).show();
+    } else {
+      Toast.makeText(this, "Erro na conexão com o MongoDB!", Toast.LENGTH_LONG).show();
+    }
+      jsmolWebView = findViewById(R.id.jsmolWebView);
     WebSettings webSettings = jsmolWebView.getSettings();
-    webSettings.setJavaScriptEnabled(true);  // Permitir JavaScript
+    webSettings.setJavaScriptEnabled(true);
     webSettings.setDomStorageEnabled(true);
-    webSettings.setAllowFileAccess(true);
-    webSettings.setAllowContentAccess(true);
-    jsmolWebView.setWebViewClient(new WebViewClient());  // Abrir URLs na própria WebView
+    jsmolWebView.setWebViewClient(new WebViewClient());
     jsmolWebView.setBackgroundColor(Color.TRANSPARENT);
 
     surfaceView = findViewById(R.id.surfaceview);
-    displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
-
-    // Set up renderer.
+    displayRotationHelper = new DisplayRotationHelper(this);
     surfaceView.setPreserveEGLContextOnPause(true);
     surfaceView.setEGLContextClientVersion(2);
-    surfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0); // Alpha used for plane blending.
+    surfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0);
     surfaceView.setRenderer(this);
     surfaceView.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
-    surfaceView.setWillNotDraw(false);
 
     fitToScanView = findViewById(R.id.image_view_fit_to_scan);
     glideRequestManager = Glide.with(this);
-    glideRequestManager
-        .load(Uri.parse("file:///android_asset/fit_to_scan.png"))
-        .into(fitToScanView);
+    glideRequestManager.load(Uri.parse("file:///android_asset/fit_to_scan.png")).into(fitToScanView);
 
     installRequested = false;
-
-
     binding.Boton.setOnClickListener(view -> {
-      Log.d("QuimicAR", "Botão clicado");
+      Log.d(TAG, "Botão clicado");
       Intent intent = new Intent(QuimicAR.this, Regras.class);
       intent.putExtra("FILENAME", "Regras.txt");
       startActivity(intent);
     });
 
-
+    // Configurar a conexão com MongoDB
+    mongoDBHelper = new MongoDBHelper();
   }
 
   @Override
   protected void onDestroy() {
     if (session != null) {
-      // Explicitly close ARCore Session to release native resources.
-      // Review the API reference for important considerations before calling close() in apps with
-      // more complicated lifecycle requirements:
-      // https://developers.google.com/ar/reference/java/arcore/reference/com/google/ar/core/Session#close()
       session.close();
       session = null;
     }
-
+    mongoDBHelper.close();
     super.onDestroy();
-  }
-
-  @Override
-  protected void onResume() {
-    super.onResume();
-
-    if (session == null) {
-      Exception exception = null;
-      String message = null;
-      try {
-        switch (ArCoreApk.getInstance().requestInstall(this, !installRequested)) {
-          case INSTALL_REQUESTED:
-            installRequested = true;
-            return;
-          case INSTALLED:
-            break;
-        }
-
-        // ARCore requires camera permissions to operate. If we did not yet obtain runtime
-        // permission on Android M and above, now is a good time to ask the user for it.
-        if (!CameraPermissionHelper.hasCameraPermission(this)) {
-          CameraPermissionHelper.requestCameraPermission(this);
-          return;
-        }
-
-        session = new Session(/* context = */ this);
-      } catch (UnavailableArcoreNotInstalledException
-          | UnavailableUserDeclinedInstallationException e) {
-        message = "Por favor, instale o ARCore";
-        exception = e;
-      } catch (UnavailableApkTooOldException e) {
-        message = "Por favor, atualize o ARCore";
-        exception = e;
-      } catch (UnavailableSdkTooOldException e) {
-        message = "Por favor, atualize este aplicativo";
-        exception = e;
-      } catch (Exception e) {
-        message = "Este dispositivo não suporta o ARCore";
-        exception = e;
-      }
-
-      if (message != null) {
-        messageSnackbarHelper.showError(this, message);
-        Log.e(TAG, "Exceção ao criar sessão", exception);
-        return;
-      }
-
-      shouldConfigureSession = true;
-    }
-
-    if (shouldConfigureSession) {
-      configureSession();
-      shouldConfigureSession = false;
-    }
-
-    // Note that order matters - see the note in onPause(), the reverse applies here.
-    try {
-      session.resume();
-    } catch (CameraNotAvailableException e) {
-      messageSnackbarHelper.showError(this, "Câmera indisponível. Tente reiniciar o aplicativo.");
-      session = null;
-      return;
-    }
-    surfaceView.onResume();
-    displayRotationHelper.onResume();
-
-    fitToScanView.setVisibility(View.VISIBLE);
-  }
-
-  @Override
-  public void onPause() {
-    super.onPause();
-    if (session != null) {
-      // Note that the order matters - GLSurfaceView is paused first so that it does not try
-      // to query the session. If Session is paused before GLSurfaceView, GLSurfaceView may
-      // still call session.update() and get a SessionPausedException.
-      displayRotationHelper.onPause();
-      surfaceView.onPause();
-      session.pause();
-    }
-  }
-
-  @Override
-  public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
-    super.onRequestPermissionsResult(requestCode, permissions, results);
-    if (!CameraPermissionHelper.hasCameraPermission(this)) {
-      Toast.makeText(
-              this, "É necessário permitir o acesso à câmera!", Toast.LENGTH_LONG)
-          .show();
-      if (!CameraPermissionHelper.shouldShowRequestPermissionRationale(this)) {
-        // Permission denied with checking "Do not ask again".
-        CameraPermissionHelper.launchPermissionSettings(this);
-      }
-      finish();
-    }
-  }
-
-  @Override
-  public void onWindowFocusChanged(boolean hasFocus) {
-    super.onWindowFocusChanged(hasFocus);
-    FullScreenHelper.setFullScreenOnWindowFocusChanged(this, hasFocus);
   }
 
   @Override
   public void onSurfaceCreated(GL10 gl, EGLConfig config) {
     GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-
-    // Prepare the rendering objects. This involves reading shaders, so may throw an IOException.
     try {
-      // Create the texture and pass it to ARCore session to be filled during update().
-      backgroundRenderer.createOnGlThread(/*context=*/ this);
-      augmentedImageRenderer.createOnGlThread(/*context=*/ this);
-    } catch (IOException e) {
-      Log.e(TAG, "Falha ao ler arquivo", e);
+      backgroundRenderer.createOnGlThread(this);
+    } catch (Exception e) {
+      Log.e(TAG, "Erro ao inicializar o renderizador de fundo", e);
     }
   }
 
   @Override
   public void onSurfaceChanged(GL10 gl, int width, int height) {
-    displayRotationHelper.onSurfaceChanged(width, height);
     GLES20.glViewport(0, 0, width, height);
   }
 
   @Override
   public void onDrawFrame(GL10 gl) {
-
-    // Clear screen to notify driver it should not load any pixels from previous frame.
     GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+    if (session == null) return;
 
-    if (session == null) {
-      return;
-    }
-    // Notify ARCore session that the view size changed so that the perspective matrix and
-    // the video background can be properly adjusted.
     displayRotationHelper.updateSessionIfNeeded(session);
 
     try {
       session.setCameraTextureName(backgroundRenderer.getTextureId());
-
-      // Obtain the current frame from ARSession. When the configuration is set to
-      // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
-      // camera framerate.
       Frame frame = session.update();
       Camera camera = frame.getCamera();
-
-
-      // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
       trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
-
-      // If frame is ready, render camera preview image to the GL surface.
       backgroundRenderer.draw(frame);
 
-      // Get projection matrix.
       float[] projmtx = new float[16];
       camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f);
 
-      // Get camera matrix and draw.
       float[] viewmtx = new float[16];
       camera.getViewMatrix(viewmtx, 0);
 
-      // Compute lighting from average intensity of the image.
-      final float[] colorCorrectionRgba = new float[4];
+      float[] colorCorrectionRgba = new float[4];
       frame.getLightEstimate().getColorCorrection(colorCorrectionRgba, 0);
 
-      // Visualize augmented images.
-      drawAugmentedImages(frame, projmtx, viewmtx, colorCorrectionRgba);
+      augmentedImageRenderer.drawAugmentedImages(augmentedImageMap, viewmtx, projmtx, colorCorrectionRgba);
+
+      for (AugmentedImage augmentedImage : frame.getUpdatedTrackables(AugmentedImage.class)) {
+        if (augmentedImage.getTrackingState() == TrackingState.TRACKING) {
+          processAugmentedImage(augmentedImage);
+        }
+      }
     } catch (Throwable t) {
-      // Avoid crashing the application due to unhandled exceptions.
-      Log.e(TAG, "exceção na thread OpenGL", t);
+      Log.e(TAG, "Exceção na thread OpenGL", t);
     }
   }
 
-  private void configureSession() {
-    Config config = new Config(session);
-    config.setFocusMode(Config.FocusMode.AUTO);
-    if (!setupAugmentedImageDatabase(config)) {
-      messageSnackbarHelper.showError(this, "Não foi possível estabelecer o banco de dados");
-    }
-    session.configure(config);
-  }
+  private void processAugmentedImage(AugmentedImage augmentedImage) {
+    try {
+      // Substituímos a tentativa de capturar a imagem diretamente pelo ID dela
+      int index = augmentedImage.getIndex();
+      Log.d(TAG, "Imagem aumentada reconhecida com índice: " + index);
 
-  private void drawAugmentedImages(
-      Frame frame, float[] projmtx, float[] viewmtx, float[] colorCorrectionRgba) {
-    Collection<AugmentedImage> updatedAugmentedImages =
-        frame.getUpdatedTrackables(AugmentedImage.class);
+      InputImage inputImage = InputImage.fromBitmap(createPlaceholderBitmap(), 0);
 
-    // Iterate to update augmentedImageMap, remove elements we cannot draw.
-    for (AugmentedImage augmentedImage : updatedAugmentedImages) {
-      switch (augmentedImage.getTrackingState()) {
-        case PAUSED:
-          // When an image is in PAUSED state, but the camera is not PAUSED, it has been detected,
-          // but not yet tracked.
-          String text = "Imagem "+ augmentedImage.getIndex()+ " detectada";
-          messageSnackbarHelper.showMessage(this, text);
-          session.getConfig().setAugmentedImageDatabase(null);
-          break;
-
-        case TRACKING:
-          // Have to switch to UI Thread to update View.
-          this.runOnUiThread(
-              new Runnable() {
-                @Override
-                public void run() {
-                  fitToScanView.setVisibility(View.GONE);
+      TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+              .process(inputImage)
+              .addOnSuccessListener(texts -> {
+                String recognizedText = texts.getText();
+                Document doc = mongoDBHelper.findObject3D(recognizedText);
+                if (doc != null) {
+                  String object3D = doc.getString("objeto3D");
+                  if (object3D != null) {
+                    runOnUiThread(() -> jsmolWebView.loadUrl("file:///android_asset/" + object3D));
+                  }
+                } else {
+                  Log.d(TAG, "Objeto 3D não encontrado no MongoDB.");
                 }
-              });
-
-          // Create a new anchor for newly found images.
-          if (!augmentedImageMap.containsKey(augmentedImage.getIndex())) {
-            Anchor centerPoseAnchor = augmentedImage.createAnchor(augmentedImage.getCenterPose());
-            augmentedImageMap.put(
-                augmentedImage.getIndex(), Pair.create(augmentedImage, centerPoseAnchor));
-          }
-          break;
-
-        case STOPPED:
-          augmentedImageMap.remove(augmentedImage.getIndex());
-          break;
-
-        default:
-          break;
-      }
-    }
-
-    // Draw all images in augmentedImageMap
-    for (Pair<AugmentedImage, Anchor> pair : augmentedImageMap.values()) {
-      AugmentedImage augmentedImage = pair.first;
-      Anchor centerAnchor = augmentedImageMap.get(augmentedImage.getIndex()).second;
-      switch (augmentedImage.getTrackingState()) {
-        case TRACKING:
-          // Carregar o arquivo HTML inicial
-//          runOnUiThread(new Runnable() {
-//            @Override
-//            public void run() { jsmolWebView.loadUrl("file:///android_asset/index.html");}
-//          });
-          augmentedImageRenderer.draw(
-              viewmtx, projmtx, augmentedImage, centerAnchor, colorCorrectionRgba);
-          break;
-        default:
-          break;
-      }
+              })
+              .addOnFailureListener(e -> Log.e(TAG, "Erro ao reconhecer texto", e));
+    } catch (Exception e) {
+      Log.e(TAG, "Erro ao processar a imagem aumentada", e);
     }
   }
 
-  private boolean setupAugmentedImageDatabase(Config config) {
-    AugmentedImageDatabase augmentedImageDatabase;
-
-    // There are two ways to configure an AugmentedImageDatabase:
-    // 1. Add Bitmap to DB directly
-    // 2. Load a pre-built AugmentedImageDatabase
-    // Option 2) has
-    // * shorter setup time
-    // * doesn't require images to be packaged in apk.
-    if (useSingleImage) {
-      Bitmap augmentedImageBitmap = loadAugmentedImageBitmap();
-      if (augmentedImageBitmap == null) {
-        return false;
-      }
-
-      augmentedImageDatabase = new AugmentedImageDatabase(session);
-      augmentedImageDatabase.addImage("image_name", augmentedImageBitmap,0.4f);
-      // If the physical size of the image is known, you can instead use:
-      //     augmentedImageDatabase.addImage("image_name", augmentedImageBitmap, widthInMeters);
-      // This will improve the initial detection speed. ARCore will still actively estimate the
-      // physical size of the image as it is viewed from multiple viewpoints.
-    } else {
-      // This is an alternative way to initialize an AugmentedImageDatabase instance    ,
-      // load a pre-existing augmented image database.
-      try (InputStream is = getAssets().open("app.imgdb")) {
-        augmentedImageDatabase = AugmentedImageDatabase.deserialize(session, is);
-      } catch (IOException e) {
-        Log.e(TAG, "Exceção IO ao carregar o banco de dados.", e);
-        return false;
-      }
-    }
-
-    config.setAugmentedImageDatabase(augmentedImageDatabase);
-    return true;
+  private Bitmap createPlaceholderBitmap() {
+    Bitmap bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
+    bitmap.eraseColor(Color.GRAY);
+    return bitmap;
   }
 
-  private Bitmap loadAugmentedImageBitmap() {
-    try (InputStream is = getAssets().open("default.jpg")) {
-      return BitmapFactory.decodeStream(is);
-    } catch (IOException e) {
-      Log.e(TAG, "Exceção IO ao carregar bitmap da imagem.", e);
-    }
-    return null;
-  }
 }

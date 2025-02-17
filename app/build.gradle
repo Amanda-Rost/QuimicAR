@@ -1,7 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'com.chaquo.python'  // Chaquopy plugin para integração com Python
+    id 'com.chaquo.python'
 }
 
 android {
@@ -11,8 +11,6 @@ android {
         applicationId "com.google.ar.core.examples.java.principal"
         resourceConfigurations += ["en", "br"]
 
-        // "AR Optional" apps must declare minSdkVersion >= 14.
-        // "AR Required" apps must declare minSdkVersion >= 24.
         minSdkVersion 24
         targetSdkVersion 34
         versionCode 1
@@ -22,11 +20,10 @@ android {
             abiFilters 'arm64-v8a', 'x86_64'
         }
 
-        // Configuração do Chaquopy Python
         python {
-            version "3.8" // Versão do Python que você deseja usar
+            version "3.8"
             pip {
-                install "requests"  // Instala a biblioteca requests via pip
+                install "requests"
             }
         }
     }
@@ -51,22 +48,40 @@ android {
     }
 
     namespace 'com.google.ar.core.examples.java.principal'
+
+    packagingOptions {
+        exclude 'META-INF/native-image/org.mongodb/bson/native-image.properties'
+    }
 }
 
 dependencies {
     // ARCore (Google Play Services for AR) library.
     implementation 'com.google.ar:core:1.46.0'
 
-    // Obj - a simple Wavefront OBJ file loader
+    // Inclui o ML Kit Text Recognition no projeto
+    implementation 'com.google.mlkit:text-recognition:16.0.0'
+    implementation 'com.google.mlkit:vision-common:17.3.0'
+
+    // Obj - A simple Wavefront OBJ file loader
     implementation 'de.javagl:obj:0.4.0'
 
     // Glide - An image loading and caching library for Android
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
 
+    // KMongo (MongoDB para Android)
+    implementation 'org.litote.kmongo:kmongo:4.4.0'
+    implementation 'org.litote.kmongo:kmongo-async:4.4.0'
+    implementation 'org.litote.kmongo:kmongo-coroutine:4.4.0'
+
     // Core AndroidX libraries
     implementation 'androidx.core:core-ktx:1.15.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
     implementation 'com.google.android.material:material:1.12.0'
+
+
+    // Dependência SLF4J
+    implementation 'org.slf4j:slf4j-android:1.7.36'
+
 }
