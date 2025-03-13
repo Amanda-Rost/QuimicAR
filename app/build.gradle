@@ -1,87 +1,66 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-    id 'com.chaquo.python'
 }
 
 android {
-    compileSdkVersion 35
+    namespace "com.google.ar.core.examples.java.principal"
+    compileSdk 34
+
+    viewBinding {
+        enabled = true
+    }
 
     defaultConfig {
         applicationId "com.google.ar.core.examples.java.principal"
-        resourceConfigurations += ["en", "br"]
-
-        minSdkVersion 24
-        targetSdkVersion 34
+        minSdk 24
+        targetSdk 34
         versionCode 1
-        versionName '1.0'
+        versionName "1.0"
 
-        ndk {
-            abiFilters 'arm64-v8a', 'x86_64'
-        }
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
 
-        python {
-            version "3.8"
-            pip {
-                install "requests"
-            }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+
+    packagingOptions {
+        exclude 'META-INF/native-image/org.mongodb/bson/native-image.properties'
     }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-    }
-
-    viewBinding {
-        enabled = true
-    }
-
-    namespace 'com.google.ar.core.examples.java.principal'
-
-    packagingOptions {
-        exclude 'META-INF/native-image/org.mongodb/bson/native-image.properties'
-    }
 }
 
 dependencies {
-    // ARCore (Google Play Services for AR) library.
+
+    // ARCore para renderização de objetos 3D
     implementation 'com.google.ar:core:1.46.0'
 
-    // Inclui o ML Kit Text Recognition no projeto
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // ML Kit para reconhecimento de texto
     implementation 'com.google.mlkit:text-recognition:16.0.0'
-    implementation 'com.google.mlkit:vision-common:17.3.0'
 
-    // Obj - A simple Wavefront OBJ file loader
+    // MongoDB Java Reactive Streams Driver
+    implementation 'org.mongodb:mongodb-driver-reactivestreams:4.9.1'
+
     implementation 'de.javagl:obj:0.4.0'
-
-    // Glide - An image loading and caching library for Android
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
 
-    // KMongo (MongoDB para Android)
-    implementation 'org.litote.kmongo:kmongo:4.4.0'
-    implementation 'org.litote.kmongo:kmongo-async:4.4.0'
-    implementation 'org.litote.kmongo:kmongo-coroutine:4.4.0'
+    // Outras dependências comuns
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.6.2'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2'
 
-    // Core AndroidX libraries
-    implementation 'androidx.core:core-ktx:1.15.0'
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
-    implementation 'com.google.android.material:material:1.12.0'
-
-
-    // Dependência SLF4J
-    implementation 'org.slf4j:slf4j-android:1.7.36'
-
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }

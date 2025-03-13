@@ -36,13 +36,13 @@ public class TextRecognitionHelper {
                             Log.d("TextRecognition", "Texto reconhecido: " + recognizedText);
 
                             // Buscar o objeto 3D no banco de dados
-                            Document result = mongoDBHelper.findObject3D(recognizedText);
-                            if (result != null) {
-                                String object3D = result.getString("objeto3D");
-                                listener.onObjectFound(object3D);
-                            } else {
-                                Log.e("TextRecognition", "Nenhum modelo 3D correspondente encontrado.");
-                            }
+                       //     Document result = mongoDBHelper.findObject3D(recognizedText);
+//                            if (result != null) {
+//                                String object3D = result.getString("objeto3D");
+//                                listener.onObjectFound(object3D);
+//                            } else {
+//                                Log.e("TextRecognition", "Nenhum modelo 3D correspondente encontrado.");
+//                            }
                         } else {
                             Log.e("TextRecognition", "Nenhum texto reconhecido.");
                         }
