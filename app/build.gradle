@@ -51,6 +51,8 @@ dependencies {
 
     // MongoDB Java Reactive Streams Driver
     implementation 'org.mongodb:mongodb-driver-reactivestreams:4.9.1'
+    implementation 'org.mongodb:mongodb-driver-sync:4.9.1'
+    implementation 'org.mongodb:bson:4.9.1'
 
     implementation 'de.javagl:obj:0.4.0'
     implementation 'com.github.bumptech.glide:glide:4.16.0'
