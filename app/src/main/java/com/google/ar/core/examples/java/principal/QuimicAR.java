@@ -7,6 +7,7 @@ import com.google.ar.core.Anchor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.media.Image;
 import android.net.Uri;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
@@ -34,7 +35,9 @@ import com.google.ar.core.examples.java.common.rendering.BackgroundRenderer;
 import com.google.ar.core.examples.java.principal.databinding.ActivityMainBinding;
 import com.google.ar.core.examples.java.principal.rendering.AugmentedImageRenderer;
 import com.google.ar.core.examples.java.principal.rendering.MongoDBHelper;
+import com.google.ar.core.examples.java.principal.rendering.TextRecognitionHelper;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
+import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
@@ -47,6 +50,7 @@ import org.bson.Document;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.*;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -73,7 +77,7 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
   // Augmented image and its associated center pose anchor, keyed by index of the augmented image in
   // the
   // database.
-
+  private  TextRecognitionHelper textRecognitionHelper;
   private final Map<Integer, Pair<AugmentedImage, Anchor>> augmentedImageMap = new HashMap<>();
   private MongoDBHelper mongoDBHelper;
 
@@ -90,6 +94,19 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
       Toast.makeText(this, "Erro na conexão com o MongoDB!", Toast.LENGTH_LONG).show();
     }
 
+    // Inicializa o TextRecognitionHelper
+    textRecognitionHelper = new TextRecognitionHelper(new TextRecognitionHelper.TextRecognitionListener() {
+      @Override
+      public void onObjectFound(byte[] object3D, byte[] config3D, byte[] texture) {
+        // Faça algo com o objeto encontrado (ex: renderize o modelo 3D)
+        Log.d(TAG, "Objeto 3D encontrado e pronto para renderizar!");
+      }
+
+      @Override
+      public void onTextRecognitionFailed(Exception e) {
+        Log.e(TAG, "Falha no reconhecimento de texto: " + e.getMessage());
+      }
+    }, mongoDBHelper);
 //Se precisar inserir, é só tirar o comentario do trecho abaixo,
 //Se não funcionar pode ser que sua internet esteja bloquando,
 // então use o comando base64 -w 0 arquivo.obj > arquivo.obj.base64
@@ -203,6 +220,11 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
   protected void onResume() {
     super.onResume();
 
+    if (!CameraPermissionHelper.hasCameraPermission(this)) {
+      CameraPermissionHelper.requestCameraPermission(this);
+      return;
+    }
+
     if (session == null) {
       Exception exception = null;
       String message = null;
@@ -215,25 +237,18 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
             break;
         }
 
-        // ARCore requires camera permissions to operate. If we did not yet obtain runtime
-        // permission on Android M and above, now is a good time to ask the user for it.
-        if (!CameraPermissionHelper.hasCameraPermission(this)) {
-          CameraPermissionHelper.requestCameraPermission(this);
-          return;
-        }
-
         session = new Session(/* context = */ this);
       } catch (UnavailableArcoreNotInstalledException
                | UnavailableUserDeclinedInstallationException e) {
         message = "Por favor, instale o ARCore";
         exception = e;
-      } catch (UnavailableApkTooOldException e) {
+      } catch (com.google.ar.core.exceptions.UnavailableApkTooOldException e) {
         message = "Por favor, atualize o ARCore";
         exception = e;
-      } catch (UnavailableSdkTooOldException e) {
+      } catch (com.google.ar.core.exceptions.UnavailableSdkTooOldException e) {
         message = "Por favor, atualize este aplicativo";
         exception = e;
-      } catch (Exception e) {
+      } catch (java.lang.Exception e) {
         message = "Este dispositivo não suporta o ARCore";
         exception = e;
       }
@@ -251,7 +266,6 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
       configureSession();
       shouldConfigureSession = false;
     }
-
 
     try {
       session.resume();
@@ -321,51 +335,49 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
 
   @Override
   public void onDrawFrame(GL10 gl) {
-
-    // Clear screen to notify driver it should not load any pixels from previous frame.
     GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
     if (session == null) {
       return;
     }
-    // Notify ARCore session that the view size changed so that the perspective matrix and
-    // the video background can be properly adjusted.
+
     displayRotationHelper.updateSessionIfNeeded(session);
 
     try {
-      session.setCameraTextureName(backgroundRenderer.getTextureId());
-
-      // Obtain the current frame from ARSession. When the configuration is set to
-      // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
-      // camera framerate.
       Frame frame = session.update();
       Camera camera = frame.getCamera();
 
-
-      // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
-      trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
-
-      // If frame is ready, render camera preview image to the GL surface.
+      // Atualizar a textura da câmera
+      session.setCameraTextureName(backgroundRenderer.getTextureId());
       backgroundRenderer.draw(frame);
 
-      // Get projection matrix.
-      float[] projmtx = new float[16];
-      camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f);
+      // Passar o frame para o reconhecimento de texto
+      if (camera.getTrackingState() == TrackingState.TRACKING) {
+        try {
+          // Captura a imagem do frame como Bitmap
+          Image image = frame.acquireCameraImage();
+          Bitmap bitmap = convertImageToBitmap(image);
+          image.close();
 
-      // Get camera matrix and draw.
-      float[] viewmtx = new float[16];
-      camera.getViewMatrix(viewmtx, 0);
-
-      // Compute lighting from average intensity of the image.
-      final float[] colorCorrectionRgba = new float[4];
-      frame.getLightEstimate().getColorCorrection(colorCorrectionRgba, 0);
-
-      // Visualize augmented images.
-      //  drawAugmentedImages(frame, projmtx, viewmtx, colorCorrectionRgba);
+          // Envia o Bitmap para o TextRecognitionHelper
+          textRecognitionHelper.extractTextFromImage(bitmap);
+        } catch (Exception e) {
+          Log.e(TAG, "Falha ao capturar a imagem da câmera: " + e.getMessage());
+        }
+      }
     } catch (Throwable t) {
-      // Avoid crashing the application due to unhandled exceptions.
-      Log.e(TAG, "exceção na thread OpenGL", t);
+      Log.e(TAG, "Exceção na thread OpenGL", t);
     }
+  }
+
+
+  private Bitmap convertImageToBitmap(Image image) {
+    Image.Plane[] planes = image.getPlanes();
+    ByteBuffer buffer = planes[0].getBuffer();
+    byte[] bytes = new byte[buffer.remaining()];
+    buffer.get(bytes);
+
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
   }
 
   private void configureSession() {
