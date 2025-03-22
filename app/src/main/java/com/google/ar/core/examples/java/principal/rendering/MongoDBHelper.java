@@ -56,10 +56,10 @@ public class MongoDBHelper {
     }
 
     /**
-     * Busca um composto no banco de dados pelo seu formato.
+     * Busca um composto no banco de dados pelo seu nomenclatura.
      * O resultado é retornado via callback.
      */
-    public void buscarCompostoPorFormato(String formato, OnDatabaseResultListener listener) {
+    public void buscarCompostoPorNomenclatura(String nomenclatura, OnDatabaseResultListener listener) {
         if (database == null) {
             Log.e(TAG, "Banco de dados não está conectado.");
             listener.onError(new Exception("Banco de dados não conectado"));
@@ -68,7 +68,7 @@ public class MongoDBHelper {
 
         MongoCollection<Document> collection = database.getCollection("compostos");
 
-        collection.find(Filters.eq("formato", formato)).first().subscribe(new Subscriber<Document>() {
+        collection.find(Filters.eq("nomenclatura", nomenclatura)).first().subscribe(new Subscriber<Document>() {
             @Override
             public void onSubscribe(Subscription s) {
                 s.request(1); // Solicita apenas um documento

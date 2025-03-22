@@ -34,7 +34,7 @@ public class TextRecognitionHelper {
                     Log.d(TAG, "Texto reconhecido: " + recognizedText);
 
                     // Busca o modelo no banco
-                    mongoDBHelper.buscarCompostoPorFormato(recognizedText, new MongoDBHelper.OnDatabaseResultListener() {
+                    mongoDBHelper.buscarCompostoPorNomenclatura(recognizedText, new MongoDBHelper.OnDatabaseResultListener() {
                         @Override
                         public void onSuccess(byte[] object3D, byte[] config3D, byte[] textura) {
                             listener.onObjectFound(object3D, config3D, textura);

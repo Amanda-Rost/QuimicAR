@@ -7,6 +7,8 @@ import com.google.ar.core.Anchor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Rect;
+import android.graphics.YuvImage;
 import android.media.Image;
 import android.net.Uri;
 import android.opengl.GLES20;
@@ -54,6 +56,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
+import android.graphics.ImageFormat;
 
 public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Renderer {
   private static final String TAG = "QuimicAR";
@@ -220,64 +223,65 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
   protected void onResume() {
     super.onResume();
 
-    if (!CameraPermissionHelper.hasCameraPermission(this)) {
-      CameraPermissionHelper.requestCameraPermission(this);
-      return;
-    }
+      if (CameraPermissionHelper.hasCameraPermission(this)) {
+          if (session == null) {
+              Exception exception = null;
+              String message = null;
+              try {
+                  switch (ArCoreApk.getInstance().requestInstall(this, !installRequested)) {
+                      case INSTALL_REQUESTED:
+                          installRequested = true;
+                          return;
+                      case INSTALLED:
+                          break;
+                  }
 
-    if (session == null) {
-      Exception exception = null;
-      String message = null;
-      try {
-        switch (ArCoreApk.getInstance().requestInstall(this, !installRequested)) {
-          case INSTALL_REQUESTED:
-            installRequested = true;
-            return;
-          case INSTALLED:
-            break;
-        }
+                  session = new Session(/* context = */ this);
+              } catch (UnavailableArcoreNotInstalledException
+                       | UnavailableUserDeclinedInstallationException e) {
+                  message = "Por favor, instale o ARCore";
+                  exception = e;
+              } catch (UnavailableApkTooOldException e) {
+                  message = "Por favor, atualize o ARCore";
+                  exception = e;
+              } catch (UnavailableSdkTooOldException e) {
+                  message = "Por favor, atualize este aplicativo";
+                  exception = e;
+              } catch (Exception e) {
+                  message = "Este dispositivo não suporta o ARCore";
+                  exception = e;
+              }
 
-        session = new Session(/* context = */ this);
-      } catch (UnavailableArcoreNotInstalledException
-               | UnavailableUserDeclinedInstallationException e) {
-        message = "Por favor, instale o ARCore";
-        exception = e;
-      } catch (com.google.ar.core.exceptions.UnavailableApkTooOldException e) {
-        message = "Por favor, atualize o ARCore";
-        exception = e;
-      } catch (com.google.ar.core.exceptions.UnavailableSdkTooOldException e) {
-        message = "Por favor, atualize este aplicativo";
-        exception = e;
-      } catch (java.lang.Exception e) {
-        message = "Este dispositivo não suporta o ARCore";
-        exception = e;
+              if (message != null) {
+                  messageSnackbarHelper.showError(this, message);
+                  Log.e(TAG, "Exceção ao criar sessão", exception);
+                  return;
+              }
+
+              shouldConfigureSession = true;
+          }
+
+          if (shouldConfigureSession) {
+              configureSession();
+              shouldConfigureSession = false;
+          }
+
+          try {
+              session.resume();
+          } catch (CameraNotAvailableException e) {
+              messageSnackbarHelper.showError(this, "Câmera indisponível. Tente reiniciar o aplicativo.");
+              session = null;
+              return;
+          }
+          surfaceView.onResume();
+          displayRotationHelper.onResume();
+
+          fitToScanView.setVisibility(View.VISIBLE);
+      } else {
+          CameraPermissionHelper.requestCameraPermission(this);
+          return;
       }
 
-      if (message != null) {
-        messageSnackbarHelper.showError(this, message);
-        Log.e(TAG, "Exceção ao criar sessão", exception);
-        return;
-      }
-
-      shouldConfigureSession = true;
-    }
-
-    if (shouldConfigureSession) {
-      configureSession();
-      shouldConfigureSession = false;
-    }
-
-    try {
-      session.resume();
-    } catch (CameraNotAvailableException e) {
-      messageSnackbarHelper.showError(this, "Câmera indisponível. Tente reiniciar o aplicativo.");
-      session = null;
-      return;
-    }
-    surfaceView.onResume();
-    displayRotationHelper.onResume();
-
-    fitToScanView.setVisibility(View.VISIBLE);
   }
   @Override
   public void onPause() {
@@ -334,57 +338,83 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
   }
 
   @Override
-  public void onDrawFrame(GL10 gl) {
+public void onDrawFrame(GL10 gl) {
     GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
     if (session == null) {
-      return;
+        return;
     }
 
     displayRotationHelper.updateSessionIfNeeded(session);
 
     try {
-      Frame frame = session.update();
-      Camera camera = frame.getCamera();
+        Frame frame = session.update();
+        Camera camera = frame.getCamera();
 
-      // Atualizar a textura da câmera
-      session.setCameraTextureName(backgroundRenderer.getTextureId());
-      backgroundRenderer.draw(frame);
+        // Atualizar a textura da câmera
+        session.setCameraTextureName(backgroundRenderer.getTextureId());
+        backgroundRenderer.draw(frame);
 
-      // Passar o frame para o reconhecimento de texto
-      if (camera.getTrackingState() == TrackingState.TRACKING) {
-        try {
-          // Captura a imagem do frame como Bitmap
-          Image image = frame.acquireCameraImage();
-          Bitmap bitmap = convertImageToBitmap(image);
-          image.close();
-
-          // Envia o Bitmap para o TextRecognitionHelper
-          textRecognitionHelper.extractTextFromImage(bitmap);
-        } catch (Exception e) {
-          Log.e(TAG, "Falha ao capturar a imagem da câmera: " + e.getMessage());
+        // Passar o frame para o reconhecimento de texto
+        if (camera.getTrackingState() == TrackingState.TRACKING) {
+            Image image = null;
+            try {
+                // Captura a imagem do frame como Image
+                image = frame.acquireCameraImage();
+                if (image != null) {
+                    Bitmap bitmap = convertYUVToBitmap(image);
+                    // Envia o Bitmap para o TextRecognitionHelper
+                    textRecognitionHelper.extractTextFromImage(bitmap);
+                }
+            } catch (NotYetAvailableException e) {
+                Log.w(TAG, "Imagem da câmera ainda não disponível: " + e.getMessage());
+            } catch (Exception e) {
+                Log.e(TAG, "Falha ao capturar a imagem da câmera: " + e.getMessage());
+            } finally {
+                if (image != null) {
+                    image.close();
+                }
+            }
         }
-      }
     } catch (Throwable t) {
-      Log.e(TAG, "Exceção na thread OpenGL", t);
+        Log.e(TAG, "Exceção na thread OpenGL", t);
     }
-  }
+}
 
+private Bitmap convertYUVToBitmap(Image image) {
+    // Verifique se o formato da imagem é YUV_420_888
+    if (image.getFormat() != ImageFormat.YUV_420_888) {
+        throw new IllegalArgumentException("Formato de imagem não suportado: " + image.getFormat());
+    }
 
-  private Bitmap convertImageToBitmap(Image image) {
+    // Converta a imagem YUV para um Bitmap RGB
     Image.Plane[] planes = image.getPlanes();
-    ByteBuffer buffer = planes[0].getBuffer();
-    byte[] bytes = new byte[buffer.remaining()];
-    buffer.get(bytes);
+    ByteBuffer yBuffer = planes[0].getBuffer();
+    ByteBuffer uBuffer = planes[1].getBuffer();
+    ByteBuffer vBuffer = planes[2].getBuffer();
 
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.length, null);
-  }
+    int ySize = yBuffer.remaining();
+    int uSize = uBuffer.remaining();
+    int vSize = vBuffer.remaining();
 
+    byte[] nv21 = new byte[ySize + uSize + vSize];
+
+    // U e V são intercambiados
+    yBuffer.get(nv21, 0, ySize);
+    vBuffer.get(nv21, ySize, vSize);
+    uBuffer.get(nv21, ySize + vSize, uSize);
+
+    YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, image.getWidth(), image.getHeight(), null);
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    yuvImage.compressToJpeg(new Rect(0, 0, image.getWidth(), image.getHeight()), 100, out);
+    byte[] imageBytes = out.toByteArray();
+    return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+}
   private void configureSession() {
     Config config = new Config(session);
     config.setFocusMode(Config.FocusMode.AUTO);
 //    if (!setupAugmentedImageDatabase(config)) {
-//      messageSnackbarHelper.showError(this, "Não foi possível estabelecer o banco de dados");
+//messageSnackbarHelper.showError(this, "N&atilde;o foi poss&iacute;vel estabelecer o banco de dados");
 //    }
     session.configure(config);
   }
