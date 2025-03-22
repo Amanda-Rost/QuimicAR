@@ -2,41 +2,55 @@ package com.google.ar.core.examples.java.principal.rendering;
 
 import android.content.Context;
 import android.util.Log;
-import android.util.Pair;
+
+import androidx.core.util.Pair;
+
 import com.google.ar.core.Anchor;
 import com.google.ar.core.AugmentedImage;
 import com.google.ar.core.Pose;
 import com.google.ar.core.TrackingState;
 import com.google.ar.core.examples.java.common.rendering.ObjectRenderer;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Map;
 
 public class AugmentedImageRenderer {
 
   private final ObjectRenderer molecule = new ObjectRenderer();
-  private String modelFile = "models/default_model.obj"; // Modelo padrão
-
   private static final float SCALE_FACTOR = 0.25f;
   private static final float OFFSET_Y = -0.4f;
 
   public AugmentedImageRenderer() {}
 
-  public void createOnGlThread(Context context) throws IOException {
+  /**
+   * Carrega os arquivos 3D e textura dinamicamente a partir de bytes.
+   */
+  public void createModelOnGlThread(Context context, byte[] object3D, byte[] texture) throws IOException {
     try {
-      molecule.createOnGlThread(context, modelFile, "models/pretobranco.png");
+      // Cria arquivos temporários para armazenar os dados recebidos
+      String objectPath = context.getFilesDir() + "/temp_model.obj";
+      String texturePath = context.getFilesDir() + "/temp_texture.png";
+
+      saveToFile(objectPath, object3D);
+      saveToFile(texturePath, texture);
+
+      // Carrega os arquivos no renderizador
+      molecule.createOnGlThread(context, objectPath, texturePath);
       molecule.setMaterialProperties(0.0f, 1.0f, 1.0f, 6.0f);
       molecule.setBlendMode(ObjectRenderer.BlendMode.AlphaBlending);
+
     } catch (IOException e) {
       Log.e("AugmentedImageRenderer", "Erro ao carregar modelo 3D.", e);
       throw e;
     }
   }
 
-  public void setModelFile(String object3D) {
-    if (object3D != null && !object3D.isEmpty()) {
-      modelFile = "models/" + object3D;
-    } else {
-      modelFile = "models/default_model.obj";
+  /**
+   * Salva bytes em um arquivo temporário.
+   */
+  private void saveToFile(String path, byte[] data) throws IOException {
+    try (FileOutputStream fos = new FileOutputStream(path)) {
+      fos.write(data);
     }
   }
 
@@ -52,13 +66,8 @@ public class AugmentedImageRenderer {
     }
   }
 
-  public void draw(
-          float[] viewMatrix,
-          float[] projectionMatrix,
-          AugmentedImage augmentedImage,
-          Anchor centerAnchor,
-          float[] colorCorrectionRgba) {
-
+  private void draw(float[] viewMatrix, float[] projectionMatrix, AugmentedImage augmentedImage,
+                    Anchor centerAnchor, float[] colorCorrectionRgba) {
     float[] modelMatrix = new float[16];
     float[] translationMatrix = new float[16];
     float[] scaleMatrix = new float[16];
