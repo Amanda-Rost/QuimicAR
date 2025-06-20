@@ -1,125 +1,124 @@
 package com.google.ar.core.examples.java.principal.rendering;
 
 import android.util.Log;
-import com.mongodb.ConnectionString;
-import com.mongodb.MongoClientSettings;
-import com.mongodb.client.model.Filters;
-import com.mongodb.reactivestreams.client.MongoClient;
-import com.mongodb.reactivestreams.client.MongoClients;
-import com.mongodb.reactivestreams.client.MongoDatabase;
-import org.bson.Document;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
-import org.bson.types.Binary;
-import com.mongodb.reactivestreams.client.MongoCollection;
-import com.mongodb.client.result.InsertOneResult;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public class MongoDBHelper {
 
     private static final String TAG = "MongoDBHelper";
-    private static final String CONNECTION_STRING = "mongodb://aluno:QuimicAR@cluster0.nc4hk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-    private static final String DATABASE_NAME = "QuimicAR";
-
-    private MongoClient mongoClient;
-    private MongoDatabase database;
+    private static final String BASE_URL = "https://api-conexao-mongo-db-quimic-ar-xvwf.vercel.app/";
+    private boolean isConnected;
+    private CompostoService compostoService;
 
     public MongoDBHelper() {
-        connectToMongoDB();
+        // Configura o Retrofit para se conectar ao serviço
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+
+        // Cria uma instância do serviço CompostoService
+        compostoService = retrofit.create(CompostoService.class);
     }
 
-    private void connectToMongoDB() {
-        try {
-            ConnectionString connectionString = new ConnectionString(CONNECTION_STRING);
-            MongoClientSettings settings = MongoClientSettings.builder()
-                    .applyConnectionString(connectionString)
-                    .build();
-
-
-
-            mongoClient = MongoClients.create(settings);
-            database = mongoClient.getDatabase(DATABASE_NAME);
-
-            Log.d(TAG, "Conexão com MongoDB estabelecida.");
-
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao conectar ao MongoDB: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Retorna a instância do banco de dados.
-     */
-    public MongoDatabase getDatabase() {
-        return this.database;
-    }
-
-    /**
-     * Busca um composto no banco de dados pelo seu nomenclatura.
-     * O resultado é retornado via callback.
-     */
-    public void buscarCompostoPorNomenclatura(String nomenclatura, OnDatabaseResultListener listener) {
-        if (database == null) {
-            Log.e(TAG, "Banco de dados não está conectado.");
-            listener.onError(new Exception("Banco de dados não conectado"));
-            return;
-        }
-
-        MongoCollection<Document> collection = database.getCollection("compostos");
-
-        collection.find(Filters.eq("nomenclatura", nomenclatura)).first().subscribe(new Subscriber<Document>() {
+    public void checkConnection(OnConnectionCheckListener listener) {
+        Call<Composto> call = compostoService.getCompostoByNomenclatura("METAN");
+        call.enqueue(new Callback<Composto>() {
             @Override
-            public void onSubscribe(Subscription s) {
-                s.request(1); // Solicita apenas um documento
-            }
-
-            @Override
-            public void onNext(Document document) {
-                Log.d(TAG, "Documento encontrado no MongoDB: " + document.toJson());
-
-                Binary objeto3D = document.get("3D", Binary.class);
-                Binary config3D = document.get("config3D", Binary.class);
-                Binary textura = document.get("textura", Binary.class);
-
-                if (objeto3D != null && config3D != null && textura != null) {
-                    listener.onSuccess(objeto3D.getData(), config3D.getData(), textura.getData());
+            public void onResponse(Call<Composto> call, Response<Composto> response) {
+                if (response.isSuccessful()) {
+                    setConnected(true);
+                    Log.d(TAG, "Conexão bem-sucedida!");
                 } else {
-                    Log.e(TAG, "Modelo 3D encontrado, mas está incompleto.");
-                    listener.onError(new Exception("Modelo 3D incompleto no banco de dados"));
+                    setConnected(false);
+                    Log.e(TAG, "Falha na conexão: " + response.message());
                 }
+                listener.onConnectionChecked(isConnected);
             }
 
             @Override
-            public void onError(Throwable t) {
-                Log.e(TAG, "Erro ao buscar no MongoDB: " + t.getMessage(), t);
-                listener.onError(new Exception("Erro ao buscar no MongoDB: " + t.getMessage()));
-            }
-
-            @Override
-            public void onComplete() {
-                // Busca finalizada
+            public void onFailure(Call<Composto> call, Throwable t) {
+                setConnected(false);
+                Log.e(TAG, "Erro de conexão: " + t.getMessage(), t);
+                listener.onConnectionChecked(isConnected);
             }
         });
     }
 
-    /**
-     * Interface para callback dos resultados do banco de dados.
-     */
+    public void buscarCompostoPorFormato(String formato, OnDatabaseResultListener listener) {
+        Call<Composto> call = compostoService.getCompostoByFormato(formato);
+        call.enqueue(new Callback<Composto>() {
+            @Override
+            public void onResponse(Call<Composto> call, Response<Composto> response) {
+                Log.d(TAG, "Response code: " + response.code());
+                Log.d(TAG, "Response body: " + response.body());
+
+                if (response.isSuccessful() && response.body() != null) {
+                    Composto composto = response.body();
+                    listener.onSuccess(
+                        composto.getObjeto3D(),
+                        composto.getConfig3D().getDataAsString(),
+                        composto.getTextura().getDataAsString()
+                    );
+                } else {
+                    listener.onError(new Exception("Composto não encontrado"));
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Composto> call, Throwable t) {
+                Log.e(TAG, "Erro ao buscar composto: " + t.getMessage(), t);
+                listener.onError(new Exception("Erro ao buscar composto: " + t.getMessage()));
+            }
+        });
+    }
+
+    public void buscarCompostoPorNomenclatura(String nomenclatura, OnDatabaseResultListener listener) {
+        Call<Composto> call = compostoService.getCompostoByNomenclatura(nomenclatura);
+        call.enqueue(new Callback<Composto>() {
+            @Override
+            public void onResponse(Call<Composto> call, Response<Composto> response) {
+                Log.d(TAG, "Response code: " + response.code());
+                Log.d(TAG, "Response body: " + response.body());
+
+                if (response.isSuccessful() && response.body() != null) {
+                    Composto composto = response.body();
+                    listener.onSuccess(
+                        composto.getObjeto3D(),
+                        composto.getConfig3D().getDataAsString(),
+                        composto.getTextura().getDataAsString()
+                    );
+                } else {
+                    listener.onError(new Exception("Composto não encontrado"));
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Composto> call, Throwable t) {
+                Log.e(TAG, "Erro ao buscar composto: " + t.getMessage(), t);
+                listener.onError(new Exception("Erro ao buscar composto: " + t.getMessage()));
+            }
+        });
+    }
+
+    public void setConnected(boolean verificação) {
+        this.isConnected = verificação;
+    }
+
+    public boolean getDatabase() {
+        return this.isConnected;
+    }
+
     public interface OnDatabaseResultListener {
-        void onSuccess(byte[] object3D, byte[] config3D, byte[] textura);
+        void onSuccess(String object3DPath, String config3DPath, String texturaPath);
         void onError(Exception e);
     }
 
-    /**
-     * Fecha a conexão com o MongoDB.
-     */
-    public void fecharConexao() {
-        if (mongoClient != null) {
-            mongoClient.close();
-            mongoClient = null;
-            database = null;
-            Log.d(TAG, "Conexão com MongoDB fechada.");
-        }
+    public interface OnConnectionCheckListener {
+        void onConnectionChecked(boolean isConnected);
     }
 }
