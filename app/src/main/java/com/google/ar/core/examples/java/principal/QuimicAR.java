@@ -38,6 +38,8 @@ import com.google.ar.core.examples.java.principal.databinding.ActivityMainBindin
 import com.google.ar.core.examples.java.principal.rendering.AugmentedImageRenderer;
 import com.google.ar.core.examples.java.principal.rendering.MongoDBHelper;
 import com.google.ar.core.examples.java.principal.rendering.TextRecognitionHelper;
+import com.google.ar.core.examples.java.principal.rendering.validation.OnConnectionCheckListener;
+import com.google.ar.core.examples.java.principal.rendering.MongoDBHelper;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
 import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
@@ -86,20 +88,17 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
         setContentView(binding.getRoot());
 
         mongoDBHelper = new MongoDBHelper();
-        mongoDBHelper.checkConnection(new MongoDBHelper.OnConnectionCheckListener() {
-            @Override
-            public void onConnectionChecked(boolean isConnected) {
-                if (isConnected) {
-                    Toast.makeText(QuimicAR.this, "Conectado ao MongoDB!", Toast.LENGTH_SHORT).show();
-                    Log.d(TAG, "Conexão com o banco de dados estabelecida.");
-                    // Prossiga com a lógica do aplicativo que depende da conexão
-                } else {
-                    Toast.makeText(QuimicAR.this, "Erro na conexão com o MongoDB!", Toast.LENGTH_LONG).show();
-                    Log.e(TAG, "Falha na conexão com o banco de dados.");
-                    // Lógica para lidar com a falha de conexão
-                }
+        mongoDBHelper.checkConnection(isConnected -> {
+            Log.d(TAG, "QuimicAR: OnConnectionCheckListener - onConnectionChecked. isConnected: " + isConnected);
+            if (isConnected) {
+                Toast.makeText(QuimicAR.this, "Conectado ao MongoDB!", Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "Conexão com o banco de dados estabelecida.");
+            } else {
+                Toast.makeText(QuimicAR.this, "Erro na conexão com o MongoDB!", Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Falha na conexão com o banco de dados.");
             }
         });
+
 
         // Initialize TextRecognitionHelper
         textRecognitionHelper = new TextRecognitionHelper(new TextRecognitionHelper.TextRecognitionListener() {

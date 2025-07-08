@@ -1,17 +1,20 @@
 package com.google.ar.core.examples.java.principal.rendering;
 
 import android.util.Log;
+import com.google.ar.core.examples.java.principal.rendering.validation.OnConnectionCheckListener;
+import com.google.ar.core.examples.java.principal.rendering.validation.OnDatabaseResultListener;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
+
 public class MongoDBHelper {
 
     private static final String TAG = "MongoDBHelper";
     private static final String BASE_URL = "https://api-conexao-mongo-db-quimic-ar-xvwf.vercel.app/";
-    private boolean isConnected;
+
     private CompostoService compostoService;
 
     public MongoDBHelper() {
@@ -25,31 +28,39 @@ public class MongoDBHelper {
         compostoService = retrofit.create(CompostoService.class);
     }
 
-    public void checkConnection(OnConnectionCheckListener listener) {
+    public void checkConnection(final OnConnectionCheckListener listener) {
+        if (listener == null) {
+            Log.w(TAG, "OnConnectionCheckListener is null. Cannot report connection status.");
+            return;
+        }
+
         Call<Composto> call = compostoService.getCompostoByNomenclatura("METAN");
         call.enqueue(new Callback<Composto>() {
             @Override
             public void onResponse(Call<Composto> call, Response<Composto> response) {
                 if (response.isSuccessful()) {
-                    setConnected(true);
                     Log.d(TAG, "Conexão bem-sucedida!");
+                    listener.onConnectionChecked(true);
                 } else {
-                    setConnected(false);
                     Log.e(TAG, "Falha na conexão: " + response.message());
+                    listener.onConnectionChecked(false);
                 }
-                listener.onConnectionChecked(isConnected);
             }
 
             @Override
             public void onFailure(Call<Composto> call, Throwable t) {
-                setConnected(false);
                 Log.e(TAG, "Erro de conexão: " + t.getMessage(), t);
-                listener.onConnectionChecked(isConnected);
+                listener.onConnectionChecked(false);
             }
         });
     }
 
-    public void buscarCompostoPorFormato(String formato, OnDatabaseResultListener listener) {
+    public void buscarCompostoPorFormato(String formato, final OnDatabaseResultListener listener) {
+        if (listener == null) {
+            Log.w(TAG, "buscarCompostoPorFormato: OnDatabaseResultListener eh null.");
+            return;
+        }
+
         Call<Composto> call = compostoService.getCompostoByFormato(formato);
         call.enqueue(new Callback<Composto>() {
             @Override
@@ -61,10 +72,11 @@ public class MongoDBHelper {
                     Composto composto = response.body();
                     listener.onSuccess(
                         composto.getObjeto3D(),
-                        composto.getConfig3D().getDataAsString(),
-                        composto.getTextura().getDataAsString()
+                        composto.getConfig3D(),
+                        composto.getTextura()
                     );
                 } else {
+                    Log.e(TAG, "buscarCompostoPorFormato - Error: " + response.code() + " - " + response.message());
                     listener.onError(new Exception("Composto não encontrado"));
                 }
             }
@@ -77,7 +89,12 @@ public class MongoDBHelper {
         });
     }
 
-    public void buscarCompostoPorNomenclatura(String nomenclatura, OnDatabaseResultListener listener) {
+    public void buscarCompostoPorNomenclatura(String nomenclatura, final OnDatabaseResultListener listener) {
+        if (listener == null) {
+            Log.w(TAG, "buscarCompostoPorNomenclatura: OnDatabaseResultListener eh null.");
+            return;
+        }
+
         Call<Composto> call = compostoService.getCompostoByNomenclatura(nomenclatura);
         call.enqueue(new Callback<Composto>() {
             @Override
@@ -89,10 +106,11 @@ public class MongoDBHelper {
                     Composto composto = response.body();
                     listener.onSuccess(
                         composto.getObjeto3D(),
-                        composto.getConfig3D().getDataAsString(),
-                        composto.getTextura().getDataAsString()
+                        composto.getConfig3D(),
+                        composto.getTextura()
                     );
                 } else {
+                    Log.e(TAG, "buscarCompostoPorNomenclatura - Error: " + response.code() + " - " + response.message());
                     listener.onError(new Exception("Composto não encontrado"));
                 }
             }
@@ -103,22 +121,5 @@ public class MongoDBHelper {
                 listener.onError(new Exception("Erro ao buscar composto: " + t.getMessage()));
             }
         });
-    }
-
-    public void setConnected(boolean verificação) {
-        this.isConnected = verificação;
-    }
-
-    public boolean getDatabase() {
-        return this.isConnected;
-    }
-
-    public interface OnDatabaseResultListener {
-        void onSuccess(String object3DPath, String config3DPath, String texturaPath);
-        void onError(Exception e);
-    }
-
-    public interface OnConnectionCheckListener {
-        void onConnectionChecked(boolean isConnected);
     }
 }

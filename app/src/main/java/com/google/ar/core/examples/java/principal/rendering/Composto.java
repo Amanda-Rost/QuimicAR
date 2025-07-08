@@ -10,40 +10,41 @@ public class Composto {
     @SerializedName("3D")
     private String objeto3D; // Caminho para o arquivo do modelo 3D
 
-    private BufferData config3D; // Alterado para BufferData
-    private BufferData textura;  // Alterado para BufferData
+    private String config3D; // Caminho para o arquivo da configuração 3D
 
-    // Classe interna para representar a estrutura dos campos config3D e textura
-    public static class BufferData {
-        private String type;
-        private List<Integer> data;
+    private String textura;   // Caminho para o arquivo da textura
 
-        // Getters e setters
-        public String getType() {
-            return type;
-        }
-
-        public void setType(String type) {
-            this.type = type;
-        }
-
-        public List<Integer> getData() {
-            return data;
-        }
-
-        public void setData(List<Integer> data) {
-            this.data = data;
-        }
-
-        // Método para converter a lista de inteiros em uma string
-        public String getDataAsString() {
-            StringBuilder sb = new StringBuilder();
-            for (Integer byteValue : data) {
-                sb.append((char) byteValue.intValue());
-            }
-            return sb.toString();
-        }
-    }
+    // Classe interna para representar a estrutura dos campos config3D e textura (Vai ser usada depois, quando colocarmos os arquivos no banco)
+//    public static class BufferData {
+//        private String type;
+//        private List<Integer> data;
+//
+//        // Getters e setters
+//        public String getType() {
+//            return type;
+//        }
+//
+//        public void setType(String type) {
+//            this.type = type;
+//        }
+//
+//        public List<Integer> getData() {
+//            return data;
+//        }
+//
+//        public void setData(List<Integer> data) {
+//            this.data = data;
+//        }
+//
+//        // Método para converter a lista de inteiros em uma string
+//        public String getDataAsString() {
+//            StringBuilder sb = new StringBuilder();
+//            for (Integer byteValue : data) {
+//                sb.append((char) byteValue.intValue());
+//            }
+//            return sb.toString();
+//        }
+//    }
 
     // Getters e setters para Composto
     public String getNomenclatura() {
@@ -70,19 +71,19 @@ public class Composto {
         this.objeto3D = objeto3D;
     }
 
-    public BufferData getConfig3D() {
+    public String getConfig3D() {
         return config3D;
     }
 
-    public void setConfig3D(BufferData config3D) {
+    public void setConfig3D(String config3D) {
         this.config3D = config3D;
     }
 
-    public BufferData getTextura() {
+    public String getTextura() {
         return textura;
     }
 
-    public void setTextura(BufferData textura) {
+    public void setTextura(String textura) {
         this.textura = textura;
     }
 }
