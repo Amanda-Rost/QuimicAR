@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace "com.google.ar.core.examples.java.principal"
+    namespace "config.principal"
     compileSdk 34
 
     viewBinding {
@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.google.ar.core.examples.java.principal"
+        applicationId "config.principal"
         minSdk 24
         targetSdk 34
         versionCode 1

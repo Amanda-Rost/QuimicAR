@@ -21,7 +21,7 @@
       tools:ignore="GoogleAppIndexingWarning">
 
     <activity
-        android:name="com.google.ar.core.examples.java.principal.QuimicAR"
+        android:name="config.principal.QuimicAR"
         android:configChanges="orientation|screenSize"
         android:exported="true"
         android:theme="@style/Theme.AppCompat.NoActionBar"
@@ -33,7 +33,7 @@
     </activity>
 
     <activity
-        android:name="com.google.ar.core.examples.java.principal.Regras"
+        android:name="config.principal.Regras"
         android:theme="@style/Theme.AppCompat.NoActionBar">
 
 

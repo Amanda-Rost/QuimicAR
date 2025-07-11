@@ -5,7 +5,7 @@
         "type": "java",
         "name": "Launch Android App",
         "request": "launch",
-        "mainClass": "com.google.ar.core.examples.java.principal.QuimicAR",
+        "mainClass": "config.principal.QuimicAR",
         "projectName": "QuimicAR"
       }
     ]
