@@ -3,8 +3,8 @@ package test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-import com.google.ar.core.examples.java.principal.rendering.Composto;
-import com.google.ar.core.examples.java.principal.rendering.CompostoService;
+import config.principal.rendering.Composto;
+import config.principal.rendering.CompostoService;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -45,13 +45,13 @@ public class TesteCompostoService {
             System.out.println("Objeto Composto: " + composto);
             System.out.println("Nomenclatura: " + composto.getNomenclatura());
             System.out.println("Objeto 3D Path: " + composto.getObjeto3D());
-            System.out.println("Config 3D Path: " + composto.getConfig3D().getDataAsString());
-            System.out.println("Textura Path: " + composto.getTextura().getDataAsString());
+            System.out.println("Config 3D Path: " + composto.getConfig3D());
+            System.out.println("Textura Path: " + composto.getTextura());
     
             assertEquals("METAN", composto.getNomenclatura());
             assertEquals("models/metano.obj", composto.getObjeto3D());
-            assertEquals("models/metano.mtl", composto.getConfig3D().getDataAsString());
-            assertEquals("models/pretobranco.png", composto.getTextura().getDataAsString());
+            assertEquals("models/metano.mtl", composto.getConfig3D());
+            assertEquals("models/pretobranco.png", composto.getTextura());
         } else {
             throw new AssertionError("Falha ao buscar dados da API: " + response.message());
         }
