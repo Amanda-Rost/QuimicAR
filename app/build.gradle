@@ -75,3 +75,11 @@ dependencies {
     // Dependência do Mockito para testes instrumentados no Android (se necessário)
     androidTestImplementation 'org.mockito:mockito-android:3.12.4'
 }
+
+tasks.register("start") {
+    dependsOn "assembleDebug"
+    dependsOn "installDebug"
+    doLast {
+        println "App instalado no dispositivo :D"
+    }
+}

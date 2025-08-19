@@ -42,3 +42,8 @@ Apps built with **ARCore SDK 1.12.0 or higher** are covered by the
 Apps built with **ARCore SDK 1.11.0 or lower** will be unable to host or resolve
 Cloud Anchors beginning December 2020 due to the SDK's use of an older,
 deprecated ARCore Cloud Anchor service.
+
+## To run with VS Code
+
+```bash
+./gradlew start
