@@ -18,13 +18,17 @@ public class TextRecognitionHelper {
     private static final String TAG = "TextRecognitionHelper";
     private TextRecognitionListener listener;
     private final MongoDBHelper mongoDBHelper;
-
+    private boolean canSearchDatabase = true;
     public TextRecognitionHelper(TextRecognitionListener listener, MongoDBHelper dbHelper) {
         this.listener = listener;
         this.mongoDBHelper = dbHelper;
     }
-
+    public void setCanSearchDatabase(Boolean val){
+        this.canSearchDatabase = val;
+    }
     public void extractTextFromImage(Bitmap bitmap) {
+        if (!canSearchDatabase) return;
+
         InputImage image = InputImage.fromBitmap(bitmap, 0);
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             .process(image)
@@ -36,12 +40,13 @@ public class TextRecognitionHelper {
                     return;
                 }
                 Log.d(TAG, "Texto reconhecido: " + recognizedText);
-    
+
                 // Busca o modelo no banco por formato
                 mongoDBHelper.buscarCompostoPorFormato(recognizedText, new OnDatabaseResultListener() {
                     @Override
                     public void onSuccess(String object3DPath, String config3DPath, String texturaPath) {
                         listener.onObjectFound(object3DPath, config3DPath, texturaPath);
+                        canSearchDatabase = false;
                     }
     
                     @Override

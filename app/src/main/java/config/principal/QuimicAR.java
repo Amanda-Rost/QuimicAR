@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.content.Intent;
 import android.util.Log;
 import android.util.Pair;
+import android.view.MotionEvent;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -67,7 +68,11 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
     private TextRecognitionHelper textRecognitionHelper;
     private final Map<Integer, Pair<AugmentedImage, Anchor>> augmentedImageMap = new HashMap<>();
     private MongoDBHelper mongoDBHelper;
-
+    private Frame lastFrame;
+    private Anchor currentAnchor;
+    private boolean isObjectFound = false; // true quando achou objeto e pausa extração
+    private int touchCount = 0;            // conta os toques na tela
+    private long lastTouchTime = 0;        // para detectar toques consecutivos
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -90,10 +95,25 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
         // Initialize TextRecognitionHelper
         textRecognitionHelper = new TextRecognitionHelper(new TextRecognitionListener() {
             @Override
-            public void onObjectFound(String object3DPath, String config3DPath, String texturePath) {
-                // Load and render the 3D model using the file paths
-                Log.d(TAG, "Objeto 3D encontrado e pronto para renderizar!");
-                render3DModel(object3DPath, config3DPath, texturePath);
+            public void onObjectFound(String object3DPath, String config3DPath, String texturaPath) {
+            Log.d(TAG, "Objeto 3D encontrado e pronto para renderizar!");
+            isObjectFound = true;
+                surfaceView.queueEvent(() -> {
+                    try {
+                        augmentedImageRenderer.loadModelOnGlThread(QuimicAR.this, object3DPath, texturaPath);
+
+                        if (lastFrame != null) {
+                            Pose pose = lastFrame.getCamera().getPose()
+                                    .compose(Pose.makeTranslation(0, 0, -1f));
+                            currentAnchor = session.createAnchor(pose);
+                        }
+
+                        runOnUiThread(() -> Toast.makeText(QuimicAR.this, "Carregando modelo 3D... Mantenha-se parado", Toast.LENGTH_LONG).show());
+
+                    } catch (IOException e) {
+                        Log.e(TAG, "Erro ao carregar modelo 3D", e);
+                    }
+                });
             }
 
             @Override
@@ -289,15 +309,27 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
 
             session.setCameraTextureName(backgroundRenderer.getTextureId());
             backgroundRenderer.draw(frame);
+            lastFrame = frame;
 
-            if (camera.getTrackingState() == TrackingState.TRACKING) {
+            float[] projmtx = new float[16];
+            camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f);
+
+            float[] viewmtx = new float[16];
+            camera.getViewMatrix(viewmtx, 0);
+
+            float[] colorCorrectionRgba = new float[4];
+            frame.getLightEstimate().getColorCorrection(colorCorrectionRgba, 0);
+
+              if (camera.getTrackingState() == TrackingState.TRACKING) {
                 Image image = null;
                 try {
                     image = frame.acquireCameraImage();
+                    if (isObjectFound) { // só extrai se ainda não encontrou objeto
+                    } else{
                     if (image != null) {
                         Bitmap bitmap = convertYUVToBitmap(image);
                         textRecognitionHelper.extractTextFromImage(bitmap);
-                    }
+                    }}
                 } catch (NotYetAvailableException e) {
                     Log.w(TAG, "Imagem da câmera ainda não disponível: " + e.getMessage());
                 } catch (Exception e) {
@@ -306,10 +338,19 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
                     if (image != null) {
                         image.close();
                     }
-                }
-            }
+
+            if (currentAnchor != null) {
+                augmentedImageRenderer.draw(
+                        viewmtx,
+                        projmtx,
+                        currentAnchor,
+                        colorCorrectionRgba
+                );
+              }
+           }
+          }
         } catch (Throwable t) {
-            Log.e(TAG, "Exceção na thread OpenGL", t);
+            Log.e(TAG, "Erro na thread OpenGL", t);
         }
     }
 
@@ -346,12 +387,6 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
         session.configure(config);
     }
 
-    private void render3DModel(String object3DPath, String config3DPath, String texturePath) {
-        // Implement the logic to load and render the 3D model using the file paths
-        // This may involve creating OpenGL buffers and setting up shaders
-        Log.d(TAG, "Rendering 3D model from paths: " + object3DPath + ", " + config3DPath + ", " + texturePath);
-    }
-
     private void drawAugmentedImages(
             Frame frame, float[] projmtx, float[] viewmtx, float[] colorCorrectionRgba) {
         Collection<AugmentedImage> updatedAugmentedImages =
@@ -374,8 +409,16 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
                                 }
                             });
 
-                    if (!augmentedImageMap.containsKey(augmentedImage.getIndex())) {
+                   if (!augmentedImageMap.containsKey(augmentedImage.getIndex())) {
                         Anchor centerPoseAnchor = augmentedImage.createAnchor(augmentedImage.getCenterPose());
+
+                         // Salva no mapa
+                        augmentedImageMap.put(augmentedImage.getIndex(), new Pair<>(augmentedImage, centerPoseAnchor));
+
+                        // Se for um único modelo, também atualiza o currentAnchor
+                        currentAnchor = centerPoseAnchor;
+
+                        Log.d(TAG, "Anchor criado para imagem index: " + augmentedImage.getIndex());
                     }
                     break;
 
@@ -388,16 +431,19 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
             }
         }
 
-        for (Pair<AugmentedImage, Anchor> pair : augmentedImageMap.values()) {
-            AugmentedImage augmentedImage = pair.first;
-            Anchor centerAnchor = augmentedImageMap.get(augmentedImage.getIndex()).second;
-            switch (augmentedImage.getTrackingState()) {
-                case TRACKING:
-                    break;
-                default:
-                    break;
-            }
-        }
+       for (Pair<AugmentedImage, Anchor> pair : augmentedImageMap.values()) {
+         AugmentedImage augmentedImage = pair.first;
+         Anchor centerAnchor = pair.second;
+
+        if (augmentedImage.getTrackingState() == TrackingState.TRACKING) {
+            augmentedImageRenderer.draw(
+                viewmtx,
+                projmtx,
+                centerAnchor,
+                colorCorrectionRgba
+        );
+     }
+    }
     }
 
     private Bitmap loadAugmentedImageBitmap() {
@@ -408,4 +454,26 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
         }
         return null;
     }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastTouchTime < 500) { // 2º toque em < 0,5s
+            touchCount++;
+        } else {
+            touchCount = 1; // reset se passou >0,5s
+        }
+        lastTouchTime = currentTime;
+
+        if (touchCount == 2) {
+            textRecognitionHelper.setCanSearchDatabase(true);
+            isObjectFound = false; // permite nova extração de texto
+            touchCount = 0;        // reset contador
+            Toast.makeText(this, "Extração de texto reiniciada!", Toast.LENGTH_SHORT).show();
+        }
+    }
+    return super.onTouchEvent(event);
+}
+
 }
