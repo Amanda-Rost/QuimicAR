@@ -108,8 +108,11 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
                             currentAnchor = session.createAnchor(pose);
                         }
 
-                        runOnUiThread(() -> Toast.makeText(QuimicAR.this, "Carregando modelo 3D... Mantenha-se parado", Toast.LENGTH_LONG).show());
+                        runOnUiThread(() ->{
+                            Toast.makeText(QuimicAR.this, "Carregando modelo 3D... Mantenha-se parado", Toast.LENGTH_LONG).show();
 
+                            fitToScanView.setVisibility(View.GONE);
+                        });
                     } catch (IOException e) {
                         Log.e(TAG, "Erro ao carregar modelo 3D", e);
                     }
@@ -470,7 +473,9 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
             textRecognitionHelper.setCanSearchDatabase(true);
             isObjectFound = false; // permite nova extração de texto
             touchCount = 0;        // reset contador
+            currentAnchor = null;
             Toast.makeText(this, "Extração de texto reiniciada!", Toast.LENGTH_SHORT).show();
+            runOnUiThread(() -> fitToScanView.setVisibility(View.VISIBLE));
         }
     }
     return super.onTouchEvent(event);

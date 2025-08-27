@@ -15,20 +15,9 @@ public class AugmentedImageRenderer {
 
   // Constantes para configuração
   private static final float SCALE_FACTOR = 0.25f; // Fator de escala para o modelo 3D
-  private static final float OFFSET_Y = -0.4f;     // Deslocamento no eixo Y para ajustar posição
+  private static final float OFFSET_Y = 0.0f;     // Deslocamento no eixo Y para ajustar posição
 
   public AugmentedImageRenderer() {}
-
-  public void createOnGlThread(Context context) throws IOException {
-    try {
-      molecule.createOnGlThread(context, "models/metano.obj", "models/pretobranco.png");
-      molecule.setMaterialProperties(0.0f, 1.0f, 1.0f, 6.0f);
-      molecule.setBlendMode(ObjectRenderer.BlendMode.AlphaBlending);
-    } catch (IOException e) {
-      Log.e("AugmentedImageRenderer", "Erro ao carregar modelo 3D.", e);
-      throw e;
-    }
-  }
 
   /**
    * Desenha o modelo 3D usando apenas o Anchor para posicionamento.
