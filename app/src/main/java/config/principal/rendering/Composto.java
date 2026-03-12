@@ -7,7 +7,7 @@ public class Composto {
     private String nomenclatura;
     private String formato;
 
-    @SerializedName("3D")
+    @SerializedName("objeto3D")
     private String objeto3D; // Caminho para o arquivo do modelo 3D
 
     private String config3D; // Caminho para o arquivo da configuração 3D

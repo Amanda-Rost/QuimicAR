@@ -34,7 +34,7 @@ public class MongoDBHelper {
             return;
         }
 
-        Call<Composto> call = compostoService.getCompostoByNomenclatura("METAN");
+        Call<Composto> call = compostoService.getCompostoByNomenclatura("METANO");
         call.enqueue(new Callback<Composto>() {
             @Override
             public void onResponse(Call<Composto> call, Response<Composto> response) {
