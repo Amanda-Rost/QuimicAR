@@ -15,7 +15,7 @@
    limitations under the License.
 -->
 <resources>
-  <string name="app_name">QuimicAR</string>
+  <string name="app_name">ARChemie</string>
   <string name="BTexto" border='2' bordercolor ='white'>Como jogar</string>
 
 </resources>
