@@ -42,13 +42,15 @@ public class TextRecognitionHelper {
                 Log.d(TAG, "Texto reconhecido: " + recognizedText);
 
                 // Busca o modelo no banco por formato
+
+
                 mongoDBHelper.buscarCompostoPorFormato(recognizedText, new OnDatabaseResultListener() {
                     @Override
                     public void onSuccess(String object3DPath, String config3DPath, String texturaPath) {
                         listener.onObjectFound(object3DPath, config3DPath, texturaPath);
                         canSearchDatabase = false;
                     }
-    
+
                     @Override
                     public void onError(Exception e) {
                         Log.e(TAG, "Falha ao buscar por formato: " + recognizedText, e);
@@ -58,7 +60,7 @@ public class TextRecognitionHelper {
                             public void onSuccess(String object3DPath, String config3DPath, String texturaPath) {
                                 listener.onObjectFound(object3DPath, config3DPath, texturaPath);
                             }
-    
+
                             @Override
                             public void onError(Exception e) {
                                 Log.e(TAG, "Falha ao buscar por nomenclatura: " + recognizedText, e);

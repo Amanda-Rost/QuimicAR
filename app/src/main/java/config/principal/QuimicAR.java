@@ -96,10 +96,23 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
         textRecognitionHelper = new TextRecognitionHelper(new TextRecognitionListener() {
             @Override
             public void onObjectFound(String object3DPath, String config3DPath, String texturaPath) {
-            Log.d(TAG, "Objeto 3D encontrado e pronto para renderizar!");
-            isObjectFound = true;
+
+                Log.d(TAG, "Objeto 3D encontrado!");
+
+                // Verificação para evitar crash
+                if (object3DPath == null || texturaPath == null) {
+                    Log.e(TAG, "Caminho do modelo ou textura está NULL!");
+                    return;
+                }
+
+                Log.d(TAG, "object3DPath: " + object3DPath);
+                Log.d(TAG, "texturaPath: " + texturaPath);
+
+                isObjectFound = true;
+
                 surfaceView.queueEvent(() -> {
                     try {
+
                         augmentedImageRenderer.loadModelOnGlThread(QuimicAR.this, object3DPath, texturaPath);
 
                         if (lastFrame != null) {
@@ -108,11 +121,11 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
                             currentAnchor = session.createAnchor(pose);
                         }
 
-                        runOnUiThread(() ->{
+                        runOnUiThread(() -> {
                             Toast.makeText(QuimicAR.this, "Carregando modelo 3D... Mantenha-se parado", Toast.LENGTH_LONG).show();
-
                             fitToScanView.setVisibility(View.GONE);
                         });
+
                     } catch (IOException e) {
                         Log.e(TAG, "Erro ao carregar modelo 3D", e);
                     }
