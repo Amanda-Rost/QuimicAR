@@ -96,7 +96,9 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
         textRecognitionHelper = new TextRecognitionHelper(new TextRecognitionListener() {
             @Override
             public void onObjectFound(String object3DPath, String config3DPath, String texturaPath) {
-
+                  if (isObjectFound) {
+                    return; // evita executar novamente
+                }
                 Log.d(TAG, "Objeto 3D encontrado!");
 
                 // Verificação para evitar crash
@@ -104,7 +106,7 @@ public class QuimicAR extends AppCompatActivity implements GLSurfaceView.Rendere
                     Log.e(TAG, "Caminho do modelo ou textura está NULL!");
                     return;
                 }
-
+                 Log.d(TAG, "Renderizando Objeto3D!");
                 Log.d(TAG, "object3DPath: " + object3DPath);
                 Log.d(TAG, "texturaPath: " + texturaPath);
 

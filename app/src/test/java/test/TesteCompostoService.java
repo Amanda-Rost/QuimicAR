@@ -34,7 +34,7 @@ public class TesteCompostoService {
     @Test
     public void testGetCompostoByNomenclatura() throws Exception {
         // Act
-        Call<Composto> call = compostoService.getCompostoByNomenclatura("METANO");
+        Call<Composto> call = compostoService.getCompostoByNomenclatura("METAN");
         Response<Composto> response = call.execute();
     
         // Assert
@@ -48,7 +48,7 @@ public class TesteCompostoService {
             System.out.println("Config 3D Path: " + composto.getConfig3D());
             System.out.println("Textura Path: " + composto.getTextura());
     
-            assertEquals("METANO", composto.getNomenclatura());
+            assertEquals("METAN", composto.getNomenclatura());
             assertEquals("models/metano.obj", composto.getObjeto3D());
             assertEquals("models/metano.mtl", composto.getConfig3D());
             assertEquals("models/pretobranco.png", composto.getTextura());
